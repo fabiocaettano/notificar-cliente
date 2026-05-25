@@ -24,19 +24,20 @@ def importar_dados(caminho_arquivo, numeroLinhasPular, intervalo_colunas) -> pd.
     return df
 
 def incluirColunaEmail(df_email: pd.DataFrame, df_objetos: pd.DataFrame) -> pd.DataFrame:
-    # Garantir que as colunas de junção sejam strings para evitar erro de zeros à esquerda
-    df_objetos['MCU (Unidade Distribuição)'] = df_objetos['MCU (Unidade Distribuição)'].astype(str)
-    df_email['MCU Unidade'] = df_email['MCU Unidade'].astype(str)    
+    # Garantir que as colunas de junção sejam strings para evitar erro de zeros à esquerda    
+    df_objetos['MCU (Unidade Distribuição)'] = df_objetos['MCU (Unidade Distribuição)'].astype(str).str.zfill(8)
+    df_email['MCU Unidade'] = df_email['MCU Unidade'].astype(str).str.zfill(8)
+    df_email['MCU Subordinação'] = df_email['MCU Subordinação'].astype(str).str.zfill(8)
 
     # Realizar o Merge (PROCV)
     # Selecionamos apenas as colunas necessárias do df_email para não poluir o dataset
     colunas_interesse_email = ['MCU Unidade', 'Email da Unidade', 'Email da Subordinação']
-    
+   
     df_resultado = pd.merge(
-        df_objetos, 
-        df_email[colunas_interesse_email], 
-        left_on='MCU (Unidade Distribuição)', 
-        right_on='MCU Unidade', 
+        df_objetos,
+        df_email[colunas_interesse_email],
+        left_on='MCU (Unidade Distribuição)',
+        right_on='MCU Unidade',
         how='left'
     )        
     return df_resultado
@@ -65,12 +66,12 @@ def ajustarColunas(df_completo: pd.DataFrame) -> pd.DataFrame:
 def excluirColunas(df_completo: pd.DataFrame) -> pd.DataFrame:
     # Excluir as colunas indesejadas
     colunas_para_excluir = [
-        'Centro Distribuição', 'Data Solicitação', 'Objeto Retorno', 
-        'Objeto Coleta', 'Tipo Objeto', 'Data Entrega', 
-        'Data Nível Servico', 'UF', 'Cidade', 'Logradouro', 
+        'Centro Distribuição', 'Data Solicitação', 'Objeto Retorno',
+        'Objeto Coleta', 'Tipo Objeto', 'Data Entrega',
+        'Data Nível Servico', 'UF', 'Cidade', 'Logradouro',
         'Bairro'
     ]
-    
+   
     df_completo_atualizado = df_completo.drop(columns=colunas_para_excluir, errors='ignore')
 
     return df_completo_atualizado
@@ -82,11 +83,11 @@ def incluirCategoria(df_completo: pd.DataFrame, df_tipo_pedido: pd.DataFrame) ->
 
     # Merge (similar a um PROCV) com base na coluna "Tipo de Pedido"
     df_completo = df_completo.merge(
-        df_tipo_pedido[['Tipo do Pedido', 'Categoria']], 
-        on='Tipo do Pedido', 
+        df_tipo_pedido[['Tipo do Pedido', 'Categoria']],
+        on='Tipo do Pedido',
         how='left'
     )
-    
+   
     return df_completo
 
 def eliminarRegistrosSemEmail(df_completo: pd.DataFrame) -> pd.DataFrame:
@@ -100,6 +101,8 @@ def manterRegistrosConformeDataVigente(df_completo: pd.DataFrame) -> pd.DataFram
 
     # Obter a data atual
     data_atual = pd.to_datetime(datetime.now().date())
+
+    print(f"{data_atual}")
 
     # Filtrar o DataFrame para manter apenas os registros onde "Data Prevista" é igual à data atual
     df_completo_atualizado = df_completo[df_completo['Data Prevista'] >= data_atual]    
@@ -127,35 +130,35 @@ def agruparDados(df_completo: pd.DataFrame) -> pd.DataFrame:
 def criar_email_html(row: pd.Series) -> tuple:
     """
     Cria o conteúdo HTML do email para uma unidade de distribuição
-    
+   
     Args:
         row: Linha do DataFrame agrupado contendo todos os dados
-        
+       
     Returns:
         tuple: (assunto, corpo_html, emails_destinatarios)
     """
-    
+   
     # Extrair dados da linha
     unidade_distribuicao = row['Unidade Distribuição']
     data_prevista = row['Data Prevista']
     email_unidade = row['Email da Unidade']
     email_subordinacao = row['Email da Subordinação']
     se = row['SE']
-    
+   
     # Criar lista de destinatários
     emails_destinatarios = [email_unidade]
     if pd.notna(email_subordinacao) and email_subordinacao != '':
         emails_destinatarios.append(email_subordinacao)
-    
+   
     # Formatar data para exibição
     if isinstance(data_prevista, datetime):
         data_formatada = data_prevista.strftime('%d/%m/%Y')
     else:
         data_formatada = str(data_prevista)
-    
+   
     # Criar assunto do email
     assunto = f"URGENTE: Objetos pendentes de entrega - {datetime.now().strftime('%d/%m/%Y %H:%M')} - {unidade_distribuicao} - {se}"
-    
+   
     # CSS inline para compatibilidade com clientes de email
     css = """
     <style>
@@ -246,7 +249,7 @@ def criar_email_html(row: pd.Series) -> tuple:
         }
     </style>
     """
-    
+   
     # Construir tabela com os objetos
     tabela_html = """
     <table>
@@ -264,7 +267,7 @@ def criar_email_html(row: pd.Series) -> tuple:
         </thead>
         <tbody>
     """
-    
+   
     # Iterar sobre todos os objetos da unidade
     for i in range(len(row['Objeto'])):
         tabela_html += f"""
@@ -279,12 +282,12 @@ def criar_email_html(row: pd.Series) -> tuple:
                 <td>{row['Categoria'][i]}</td>
             </tr>
         """
-    
+   
     tabela_html += """
         </tbody>
     </table>
     """
-    
+   
     # Construir o corpo completo do email
     corpo_html = f"""
     <!DOCTYPE html>
@@ -292,34 +295,34 @@ def criar_email_html(row: pd.Series) -> tuple:
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Notificação de Objetos Pendentes</title>
+        <title>Notificação de Objetos Pendentes de Baixa</title>
         {css}
     </head>
     <body>
         <div class="container">
             <div class="header">
-                <h1>Correios Brasil - Sistema de Monitoramento de Entregas</h1>
+                <h1>CLI CD LESTE/SPM - Objetos Suprimento</h1>
             </div>
-            
+           
             <div class="content">
                 <h2>Ao Gestor da <span class="highlight">{unidade_distribuicao}</span>:</h2>
-                
+               
                 <div class="alert">
                     <h3>⚠️ ATENÇÃO: PRAZO CRÍTICO</h3>
                     <p>Encaminhamos a relação de objeto(s) expedido(s) pelo CLI CD Leste à {se}, e sem a baixa finalizadora do SRO.</p>
                     <p>Hoje <span class="urgent">{data_formatada}</span> é o último dia do prazo previsto para entrega do objeto, caso não ocorra a distribuição no prazo informado, haverá impacto negativo no indicador IEP (Índice de Entrega Pontual).</p>
                 </div>
-                
+               
                 <p><strong>Solicitamos, com máxima urgência:</strong></p>
                 <ol>
                     <li>Verificar a situação dos objetos relacionados abaixo;</li>
                     <li>Realizar a distribuição e efetuar a baixa finalizadora no SRO o mais breve possível.</li>
                 </ol>
-                
+               
                 <p><strong>Total de Objetos Pendentes: <span class="urgent">{len(row['Objeto'])}</span></strong></p>
-                
+               
                 {tabela_html}
-                
+               
                 <div class="footer">
                     <p><strong>Este é um e-mail automático com o intuito de informar sobre a situação dos objetos em distribuição. Por favor, não responda.</strong></p>
                     <p>Data de Geração: {datetime.now().strftime('%d/%m/%Y %H:%M')}</p>                    
@@ -329,29 +332,29 @@ def criar_email_html(row: pd.Series) -> tuple:
     </body>
     </html>
     """
-    
+   
     return assunto, corpo_html, emails_destinatarios
 
 def processar_emails_agrupamento(df_agrupado: pd.DataFrame, pausa_email: int) -> None:
     """
     Processa o DataFrame agrupado e gera os emails para cada unidade
-    
+   
     Args:
         df_agrupado: DataFrame resultante do agrupamento
         pausa_email: Tempo de pausa entre envios de email em segundos
-        
+       
     Returns:
         list: Lista de dicionários com informações dos emails
     """
-    
+   
     emails_para_enviar = []
-    
+   
     for _, row in df_agrupado.iterrows():
         try:
             assunto, corpo_html, destinatarios = criar_email_html(row)
             enviar_email_via_webhook(destinatarios[0], assunto, corpo_html)  # Enviar para o email da unidade
             time.sleep(pausa_email)  # Pequena pausa para evitar sobrecarga no servidor de email
-                        
+                       
         except Exception as e:
             print(f"Erro ao processar email para {row['Unidade Distribuição']}: {str(e)}")
             continue
@@ -359,40 +362,40 @@ def processar_emails_agrupamento(df_agrupado: pd.DataFrame, pausa_email: int) ->
 def calcular_tempo_espera(quantidade_emails: int, limite_emails: int = 200) -> float:
     """
     Calcula o tempo de espera em segundos entre envios de emails baseado na quantidade.
-    
+   
     Args:
         quantidade_emails: Número total de emails a serem enviados
         limite_emails: Limite de emails que o servidor pode processar sem sobrecarga (padrão: 200)
-        
+       
     Returns:
         float: Tempo de espera em segundos entre cada envio
     """
-    
+   
     if quantidade_emails <= 0:
         return 0
-    
+   
     if quantidade_emails <= limite_emails:
         # Se quantidade <= limite: tempo = quantidade * 2 segundos
-        tempo_espera_segundos = quantidade_emails * 2
+        tempo_espera_segundos = quantidade_emails * 1
     else:
         # Se quantidade > limite:
-        
+       
         # 1. Dividir total de emails pelo limite, resultado +1
         divisao = quantidade_emails / limite_emails
         resultado_divisao_mais_um = math.ceil(divisao) + 1
-        
+       
         # 2. Multiplicar por 60 = "total da pausa"
         total_pausa = resultado_divisao_mais_um * 60
-        
+       
         # 3. Multiplicar total de emails por 2 = "total de segundos acima do limite"
         total_segundos_acima_limite = quantidade_emails * 2
-        
+       
         # 4. Soma do "total de segundos acima do limite" + "total da pausa" = "tempo total de espera"
         tempo_total_espera = total_segundos_acima_limite + total_pausa
-        
+       
         # 5. Dividir "tempo total de espera" pelo número de emails = "time espera em segundos"
         tempo_espera_segundos = tempo_total_espera / quantidade_emails
-    
+   
     return math.ceil(tempo_espera_segundos)
 
 def escolher_caixa_postal() -> str:
@@ -404,9 +407,9 @@ def escolher_caixa_postal() -> str:
 
     # Escolhe uma caixa postal aleatória (entre 1 e TOTAL_CAIXA_POSTAL)
     caixa_postal = random.randint(1, TOTAL_CAIXA_POSTAL)    
-    
+   
     # Monta o nome da variável de ambiente correspondente
-    webhook_url_key = f"MAKE_WEBHOOK_URL_{caixa_postal:02d}"   
+    webhook_url_key = f"MAKE_WEBHOOK_URL_{caixa_postal:02d}"  
 
     # Retorna a URL do webhook correspondente à caixa postal escolhida    
     return os.getenv(webhook_url_key)
@@ -414,12 +417,12 @@ def escolher_caixa_postal() -> str:
 def enviar_email_via_webhook(destinatario: str, assunto: str, corpo_html: str) -> bool:
     """
     Envia um único email através do webhook.
-    
+   
     Args:
         destinatario: Endereço de email do destinatário.
         assunto: Assunto do email.
         corpo_html: Corpo do email em HTML.
-    
+   
     Returns:
         True se o envio foi bem-sucedido (código HTTP 2xx), False caso contrário.
     """
@@ -427,13 +430,15 @@ def enviar_email_via_webhook(destinatario: str, assunto: str, corpo_html: str) -
     HEADERS = {"Content-Type": "application/json"}
 
     # Ajuste os nomes das chaves conforme a estrutura esperada pelo seu webhook!
-    destinatario = "fabioac@correios.com.br"
+    destinatario = "fabioac@correios.com.br;"
+    #destinatario = "fabioac@correios.com.br;jfdias@correios.com.br;"
+
     payload = {
         "destinatario": destinatario,
         "assunto": assunto,
         "corpo": corpo_html
     }
-    
+   
     try:
         response = requests.post(
             escolher_caixa_postal(),
@@ -442,55 +447,67 @@ def enviar_email_via_webhook(destinatario: str, assunto: str, corpo_html: str) -
             timeout=30
         )
         response.raise_for_status()  # Levanta exceção para códigos 4xx/5xx
-        print(f"✅ Email enviado para {destinatario} com sucesso.")
+
+        numero_emails += 1
+
+        print(f"✅ Email {numero_emails} enviado para {destinatario} com sucesso.")
         return True
     except requests.exceptions.RequestException as e:
         print(f"❌ Falha ao enviar para {destinatario}: {e}")
         if hasattr(e, 'response') and e.response is not None:
             print(f"   Resposta do servidor: {e.response.text}")
-        return False   
+        return False  
 
 
-def main():       
+def main():      
     # Importar dados dos objetos em distribuição
     caminho_arquivo = r'/mnt/c/dados/silog-previsto/objetos.xlsx'
+    #caminho_arquivo = r'C:/dados/silog-distribuição/objetos.xlsx'
     numeroLinhasPular = 8  
     intervalo_colunas = 'A:V'  
     df_objetos = importar_dados(caminho_arquivo, numeroLinhasPular, intervalo_colunas)    
     df_objetos['MCU (Unidade Distribuição)'] = df_objetos['MCU (Unidade Distribuição)'].apply(lambda x: f"{int(x):08d}")
+    print(f"Total de Objetos importados: {len(df_objetos)}")    
 
     # Importar dados dos objetos em distribuição
     caminho_arquivo = r'/mnt/c/dados/silog-previsto/email.xlsx'
+    #caminho_arquivo = r'C:/dados/informação-dos-orgãos/email.xlsx'
     numeroLinhasPular = 0  
     intervalo_colunas = 'A:D'  
     df_email = importar_dados(caminho_arquivo, numeroLinhasPular, intervalo_colunas)
+    print(f"Total de Objetos importados: {len(df_email)}")    
 
     # Importar dados dos objetos em distribuição
     caminho_arquivo = r'/mnt/c/dados/silog-previsto/tipo_pedido.xlsx'
+    #caminho_arquivo = r'C:/dados/tipo-pedido/tipo_pedido.xlsx'
     numeroLinhasPular = 0  
     intervalo_colunas = 'A:B'  
     df_tipo_pedido = importar_dados(caminho_arquivo, numeroLinhasPular, intervalo_colunas)
-    
+    print(f"Total de Objetos importados: {len(df_tipo_pedido)}")
+
     # Incluir coluna de email no DataFrame de objetos    
     df_completo = incluirColunaEmail(df_email, df_objetos)  
+    print(f"Incluir coluna emaIL")
 
     # Alterar nome das colunas para melhor entendimento
     df_completo = alterarNomeDasColunas(df_completo)
+    print(f"ALterar nome das colunas")
 
     # Ajustar colunas para separar tipo do pedido e zona de separação
     df_completo = ajustarColunas(df_completo)
+    print(f"Ajustar colunas")
 
     # Excluir colunas indesejadas
     df_completo = excluirColunas(df_completo)
+    print(f"exlcuir colunas")
 
     # Incluir categoria com base no tipo de pedido
-    df_completo = incluirCategoria(df_completo, df_tipo_pedido)    
+    df_completo = incluirCategoria(df_completo, df_tipo_pedido)            
 
-    total_registros = len(df_completo)
-    print(f"Total de registros: {total_registros}")    
 
     # Eliminar registros sem email
     df_completo = eliminarRegistrosSemEmail(df_completo)
+    print(f"Elminado unidades sem email: {len(df_completo)}")
 
     # Manter apenas registros com data prevista igual ou superior à data atual
     df_completo = manterRegistrosConformeDataVigente(df_completo)
@@ -499,17 +516,17 @@ def main():
     print(f"Total de registros após eliminar sem email: {total_registros}")
 
     # Manter o original intacto
-    df_teste = df_completo.head(120).copy()    
+    df_teste = df_completo.head(1).copy()    
 
     # Agrupar os dados para facilitar a criação do corpo do email
     df_agrupado = agruparDados(df_teste)
 
     # Calcular tempo de espera entre envios de email baseado na quantidade
     pausa_email = calcular_tempo_espera(len(df_agrupado),200)    
-    
+   
     # Processar o DataFrame agrupado para criar os emails
     processar_emails_agrupamento(df_agrupado, pausa_email)    
-      
+     
 
 if __name__ == "__main__":
     main()
