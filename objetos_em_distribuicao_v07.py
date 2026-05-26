@@ -1,3 +1,4 @@
+import glob
 import pandas as pd
 import random
 import requests
@@ -13,7 +14,8 @@ import time
 # Carregar variáveis do arquivo .env
 load_dotenv()
 
-def importar_dados(caminho_arquivo, numeroLinhasPular, intervalo_colunas) -> pd.DataFrame:    
+# importar objetos em distribuição
+def importar_objetos_em_distribuicao(caminho_arquivo, numeroLinhasPular, intervalo_colunas) -> pd.DataFrame:    
     df = pd.read_excel(caminho_arquivo, header=numeroLinhasPular, usecols=intervalo_colunas)
     # Remover possíveis linhas vazias que costumam vir em relatórios exportados
     df = df.dropna(how='all')    
@@ -22,6 +24,44 @@ def importar_dados(caminho_arquivo, numeroLinhasPular, intervalo_colunas) -> pd.
     # Se houver espaços extras dentro das células de texto
     df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
     return df
+
+# Importar dados dos pedidos
+def importar_pedidos_csv(caminho_arquivo, separador) -> pd.DataFrame:
+    lista_arquivos = glob.glob(caminho_arquivo)
+    dfs = []
+    for arquivo in lista_arquivos:
+        df = pd.read_csv(arquivo, sep=separador,low_memory=False)
+        dfs.append(df)
+    df_final = pd.concat(dfs, ignore_index=True)
+    return df_final
+
+# importar tabela MCU
+def importar_mcu(caminho_arquivo, separador, numeroLinhasPular) -> pd.DataFrame:
+    df_mcu = pd.read_csv(
+        caminho_arquivo,
+        sep=separador,
+        skiprows=numeroLinhasPular
+    )
+    return df_mcu
+
+# importar tipo de pedido
+def importar_tipo_pedido(caminho_arquivo, numeroLinhasPular, intervalo_colunas) -> pd.DataFrame:    
+    df = pd.read_excel(caminho_arquivo, header=numeroLinhasPular, usecols=intervalo_colunas)
+    # Remover possíveis linhas vazias que costumam vir em relatórios exportados
+    df = df.dropna(how='all')    
+    # Remove espaços extras no início e fim dos nomes das colunas
+    df.columns = df.columns.str.strip()
+    # Se houver espaços extras dentro das células de texto
+    df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+    return df
+
+def unificarPedidos(df_pedidos: pd.DataFrame) -> pd.DataFrame:
+    # Manter apenas as três colunas desejadas
+    df_filtrado = df_pedidos[['PED', 'TP_PED', 'CLIENTE']]
+
+    # Remover linhas duplicadas
+    df_filtrado = df_filtrado.drop_duplicates()
+    return df_filtrado
 
 def incluirColunaEmail(df_email: pd.DataFrame, df_objetos: pd.DataFrame) -> pd.DataFrame:
     # Garantir que as colunas de junção sejam strings para evitar erro de zeros à esquerda    
@@ -42,7 +82,23 @@ def incluirColunaEmail(df_email: pd.DataFrame, df_objetos: pd.DataFrame) -> pd.D
     )        
     return df_resultado
 
-def alterarNomeDasColunas(df_completo: pd.DataFrame) -> pd.DataFrame:
+def alterarNomeDasColunasMCU(df_completo: pd.DataFrame) -> pd.DataFrame:
+    # Renomear a coluna "Número Nota Fiscal" para "Número do Pedido"
+    df_completo_ajustado = df_completo.rename(columns={'Número Nota Fiscal': 'Número do Pedido'})
+
+    # Renomear a coluna "Série" para "Tipo Pedido"
+    df_completo_ajustado = df_completo_ajustado.rename(columns={'Série': 'Tipo do Pedido'})
+
+    # Renomear a coluna "Nome" para "Unidade Destino"
+    df_completo_ajustado = df_completo_ajustado.rename(columns={'Nome': 'Unidade Destino'})
+
+    # Renomear a coluna "CEP" para "CEP Destino"
+    df_completo_ajustado = df_completo_ajustado.rename(columns={'CEP': 'CEP Destino'})
+
+    return df_completo_ajustado
+
+
+def alterarNomeDasColunasObjetosEmDistribuicao(df_completo: pd.DataFrame) -> pd.DataFrame:
     # Renomear a coluna "Número Nota Fiscal" para "Número do Pedido"
     df_completo_ajustado = df_completo.rename(columns={'Número Nota Fiscal': 'Número do Pedido'})
 
@@ -97,7 +153,8 @@ def eliminarRegistrosSemEmail(df_completo: pd.DataFrame) -> pd.DataFrame:
 
 def manterRegistrosConformeDataVigente(df_completo: pd.DataFrame) -> pd.DataFrame:
     # Converter a coluna "Data Prevista" para datetime, se ainda não estiver nesse formato
-    df_completo['Data Prevista'] = pd.to_datetime(df_completo['Data Prevista'], errors='coerce')
+    #df_completo['Data Prevista'] = pd.to_datetime(df_completo['Data Prevista'], dayfirst=True, errors='coerce')
+    df_completo['Data Prevista'] = pd.to_datetime(df_completo['Data Prevista'],format='%d/%m/%Y', errors='coerce')
 
     # Obter a data atual
     data_atual = pd.to_datetime(datetime.now().date())
@@ -465,24 +522,30 @@ def main():
     #caminho_arquivo = r'C:/dados/silog-distribuição/objetos.xlsx'
     numeroLinhasPular = 8  
     intervalo_colunas = 'A:V'  
-    df_objetos = importar_dados(caminho_arquivo, numeroLinhasPular, intervalo_colunas)    
+    df_objetos = importar_objetos_em_distribuicao(caminho_arquivo, numeroLinhasPular, intervalo_colunas)    
     df_objetos['MCU (Unidade Distribuição)'] = df_objetos['MCU (Unidade Distribuição)'].apply(lambda x: f"{int(x):08d}")
     print(f"Total de Objetos importados: {len(df_objetos)}")    
 
-    # Importar dados dos objetos em distribuição
-    caminho_arquivo = r'/mnt/c/dados/silog-previsto/email.xlsx'
+    # Importar dados dos emails das unidades
+    caminho_arquivo = r'/mnt/c/dados/mcu/R55001A_ECT0001.txt'
     #caminho_arquivo = r'C:/dados/informação-dos-orgãos/email.xlsx'
-    numeroLinhasPular = 0  
-    intervalo_colunas = 'A:D'  
-    df_email = importar_dados(caminho_arquivo, numeroLinhasPular, intervalo_colunas)
-    print(f"Total de Objetos importados: {len(df_email)}")    
+    numeroLinhasPular = 2  
+    separador = "\t"
+    df_email = importar_mcu(caminho_arquivo, separador , numeroLinhasPular=numeroLinhasPular)
+    print(f"Total de registros de email importados: {len(df_email)}")
+    
+    # Importar dados dos pedidos
+    caminho_arquivo = r'/mnt/c/dados/pedidos/atendidos-por-item/*.csv'
+    df_pedidos = importar_pedidos_csv(caminho_arquivo, separador=";")
+    df_pedidos_filtrado = unificarPedidos(df_pedidos)
+    print(f"Total de pedidos importados: {len(df_pedidos_filtrado)}")
 
     # Importar dados dos objetos em distribuição
     caminho_arquivo = r'/mnt/c/dados/silog-previsto/tipo_pedido.xlsx'
     #caminho_arquivo = r'C:/dados/tipo-pedido/tipo_pedido.xlsx'
     numeroLinhasPular = 0  
     intervalo_colunas = 'A:B'  
-    df_tipo_pedido = importar_dados(caminho_arquivo, numeroLinhasPular, intervalo_colunas)
+    df_tipo_pedido = importar_tipo_pedido(caminho_arquivo, numeroLinhasPular, intervalo_colunas)
     print(f"Total de Objetos importados: {len(df_tipo_pedido)}")
 
     # Incluir coluna de email no DataFrame de objetos    
@@ -490,7 +553,7 @@ def main():
     print(f"Incluir coluna emaIL")
 
     # Alterar nome das colunas para melhor entendimento
-    df_completo = alterarNomeDasColunas(df_completo)
+    df_completo = alterarNomeDasColunasObjetosEmDistribuicao(df_completo)
     print(f"ALterar nome das colunas")
 
     # Ajustar colunas para separar tipo do pedido e zona de separação
@@ -525,7 +588,7 @@ def main():
     pausa_email = calcular_tempo_espera(len(df_agrupado),200)    
    
     # Processar o DataFrame agrupado para criar os emails
-    processar_emails_agrupamento(df_agrupado, pausa_email)    
+    #processar_emails_agrupamento(df_agrupado, pausa_email)    
      
 
 if __name__ == "__main__":
