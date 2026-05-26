@@ -82,20 +82,20 @@ def incluirColunaEmail(df_email: pd.DataFrame, df_objetos: pd.DataFrame) -> pd.D
     )        
     return df_resultado
 
-def alterarNomeDasColunasMCU(df_completo: pd.DataFrame) -> pd.DataFrame:
+def alterarNomeDasColunasMCU(df_email: pd.DataFrame) -> pd.DataFrame:
     # Renomear a coluna "Número Nota Fiscal" para "Número do Pedido"
-    df_completo_ajustado = df_completo.rename(columns={'Número Nota Fiscal': 'Número do Pedido'})
+    df_email_ajustado = df_email.rename(columns={'MCU Unidade' :'Unidades de Negócios'})
 
     # Renomear a coluna "Série" para "Tipo Pedido"
-    df_completo_ajustado = df_completo_ajustado.rename(columns={'Série': 'Tipo do Pedido'})
+    df_email_ajustado = df_email_ajustado.rename(columns={'Cliente': 'Nº Cad Geral'})
 
     # Renomear a coluna "Nome" para "Unidade Destino"
-    df_completo_ajustado = df_completo_ajustado.rename(columns={'Nome': 'Unidade Destino'})
+    df_email_ajustado = df_email_ajustado.rename(columns={'NomeMCU Subordinação': 'Subordinação administrativa'})
 
     # Renomear a coluna "CEP" para "CEP Destino"
-    df_completo_ajustado = df_completo_ajustado.rename(columns={'CEP': 'CEP Destino'})
+    df_email_ajustado = df_email_ajustado.rename(columns={'Email da Subordinação': 'Email Subordinação Administrativa'})
 
-    return df_completo_ajustado
+    return df_email_ajustado
 
 
 def alterarNomeDasColunasObjetosEmDistribuicao(df_completo: pd.DataFrame) -> pd.DataFrame:
@@ -547,6 +547,10 @@ def main():
     intervalo_colunas = 'A:B'  
     df_tipo_pedido = importar_tipo_pedido(caminho_arquivo, numeroLinhasPular, intervalo_colunas)
     print(f"Total de Objetos importados: {len(df_tipo_pedido)}")
+
+    # Alterar nome das colunas do DataFrame de email para facilitar o merge
+    df_email = alterarNomeDasColunasMCU(df_email)
+    print(f"Alterar nome das colunas do DataFrame de email")
 
     # Incluir coluna de email no DataFrame de objetos    
     df_completo = incluirColunaEmail(df_email, df_objetos)  
